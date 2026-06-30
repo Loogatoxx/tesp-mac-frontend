@@ -20,7 +20,7 @@ export default function LoginPage() {
     try {
       const { jwt, user } = await login(identifier, password);
       guardarSessao(jwt, user);
-      router.push('/admin');
+      window.location.href = '/admin';
     } catch (e) {
       setErro(e.message);
     } finally {
@@ -51,9 +51,14 @@ export default function LoginPage() {
               required
             />
           </Form.Group>
+          <div className="d-flex justify-content-end gap-2">
           <Button type="submit" disabled={loading}>
             {loading ? 'A entrar...' : 'Entrar'}
           </Button>
+          <Button  type="submit" onClick={() => router.push('/register')}>
+            Register
+          </Button>
+            </div>
         </Form>
       </Card.Body>
     </Card>

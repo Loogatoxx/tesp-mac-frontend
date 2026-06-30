@@ -8,8 +8,9 @@ import {
   criarProduto,
   atualizarProduto,
   apagarProduto,
+  uploadImagem,
 } from '@/lib/api';
-import { getJwt, getUser } from '@/lib/auth';
+import { getJwt, isGestor } from '@/lib/auth';
 
 const VAZIO = {
   Nome: '',
@@ -19,18 +20,21 @@ const VAZIO = {
   Stock: 0,
   Disponivel: true,
 };
-const CATEGORIAS = ['Anfibio', 'Reptil', 'Peixe', 'Aracnideo', 'Mamifero', 'Ave', 'Outro'];
+const CATEGORIAS = ['Anfibio', 'Reptil', 'Peixe', 'Aracnideo', 'Mamifero', 'Ave','Inseto', 'Outro'];
 
 export default function AdminPage() {
   const [jwt, setJwt] = useState(null);
+  const [gestor, setGestor] = useState(false);
   const [produtos, setProdutos] = useState([]);
   const [form, setForm] = useState(VAZIO);
   const [editId, setEditId] = useState(null); // documentId em edicao
   const [msg, setMsg] = useState(null);
   const [erro, setErro] = useState(null);
+  const [ficheiro, setFicheiro] = useState(null);
 
   useEffect(() => {
     setJwt(getJwt());
+    setGestor(isGestor());
     carregar();
   }, []);
 
@@ -50,12 +54,16 @@ export default function AdminPage() {
     e.preventDefault();
     setErro(null);
     setMsg(null);
-    const dados = {
-      ...form,
-      Preco: Number(form.Preco),
-      Stock: Number(form.Stock),
-    };
     try {
+      // 1) upload da imagem PRIMEIRO (se houver ficheiro escolhido)
+      let fotoId = null;
+      if (ficheiro) fotoId = await uploadImagem(ficheiro, jwt);
+
+      // 2) montar os dados — já com a foto
+      const dados = { ...form, Preco: Number(form.Preco), Stock: Number(form.Stock) };
+      if (fotoId) dados.Foto = fotoId;
+
+      // 3) gravar
       if (editId) {
         await atualizarProduto(editId, dados, jwt);
         setMsg('Produto atualizado.');
@@ -63,8 +71,10 @@ export default function AdminPage() {
         await criarProduto(dados, jwt);
         setMsg('Produto criado.');
       }
+
       setForm(VAZIO);
       setEditId(null);
+      setFicheiro(null);
       carregar();
     } catch (e) {
       setErro(e.message);
@@ -97,105 +107,111 @@ export default function AdminPage() {
     }
   }
 
-  if (!jwt) {
+  if (!jwt || !gestor) {
     return (
-      <Alert variant="warning">
-        Precisas de <Link href="/login">iniciar sessão</Link> para gerir produtos.
-      </Alert>
+        <Alert variant="warning">
+          Não tens permissão para gerir produtos. Inicia sessão como gestor em{' '}
+          <Link href="/login">login</Link>.
+        </Alert>
     );
   }
 
   return (
-    <>
-      <h1 className="mb-3">Gestão de Produtos</h1>
-      {msg && (
-        <Alert variant="success" onClose={() => setMsg(null)} dismissible>
-          {msg}
-        </Alert>
-      )}
-      {erro && (
-        <Alert variant="danger" onClose={() => setErro(null)} dismissible>
-          {erro}
-        </Alert>
-      )}
+      <>
+        <h1 className="mb-3">Gestão de Produtos</h1>
+        {msg && (
+            <Alert variant="success" onClose={() => setMsg(null)} dismissible>
+              {msg}
+            </Alert>
+        )}
+        {erro && (
+            <Alert variant="danger" onClose={() => setErro(null)} dismissible>
+              {erro}
+            </Alert>
+        )}
 
-      <Card className="mb-4">
-        <Card.Body>
-          <Card.Title>{editId ? 'Editar produto' : 'Novo produto'}</Card.Title>
-          <Form onSubmit={submeter}>
-            <Row className="g-3">
-              <Col md={6}>
-                <Form.Label>Nome</Form.Label>
-                <Form.Control
-                  value={form.Nome}
-                  onChange={(e) => alterar('Nome', e.target.value)}
-                  required
-                />
-              </Col>
-              <Col md={3}>
-                <Form.Label>Preço (€)</Form.Label>
-                <Form.Control
-                  type="number"
-                  step="0.01"
-                  value={form.Preco}
-                  onChange={(e) => alterar('Preco', e.target.value)}
-                  required
-                />
-              </Col>
-              <Col md={3}>
-                <Form.Label>Stock</Form.Label>
-                <Form.Control
-                  type="number"
-                  value={form.Stock}
-                  onChange={(e) => alterar('Stock', e.target.value)}
-                />
-              </Col>
-              <Col md={4}>
-                <Form.Label>Categoria</Form.Label>
-                <Form.Select
-                  value={form.Categoria}
-                  onChange={(e) => alterar('Categoria', e.target.value)}
-                >
-                  {CATEGORIAS.map((c) => (
-                    <option key={c}>{c}</option>
-                  ))}
-                </Form.Select>
-              </Col>
-              <Col md={8}>
-                <Form.Label>Descrição</Form.Label>
-                <Form.Control
-                  value={form.Descricao}
-                  onChange={(e) => alterar('Descricao', e.target.value)}
-                />
-              </Col>
-              <Col xs={12}>
-                <Form.Check
-                  label="Disponível"
-                  checked={form.Disponivel}
-                  onChange={(e) => alterar('Disponivel', e.target.checked)}
-                />
-              </Col>
-            </Row>
-            <div className="mt-3">
-              <Button type="submit">{editId ? 'Guardar' : 'Criar'}</Button>{' '}
-              {editId && (
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setForm(VAZIO);
-                    setEditId(null);
-                  }}
-                >
-                  Cancelar
-                </Button>
-              )}
-            </div>
-          </Form>
-        </Card.Body>
-      </Card>
+        <Card className="mb-4">
+          <Card.Body>
+            <Card.Title>{editId ? 'Editar produto' : 'Novo produto'}</Card.Title>
+            <Form onSubmit={submeter}>
+              <Row className="g-3">
+                <Col md={6}>
+                  <Form.Label>Nome</Form.Label>
+                  <Form.Control
+                      value={form.Nome}
+                      onChange={(e) => alterar('Nome', e.target.value)}
+                      required
+                  />
+                </Col>
+                <Col md={3}>
+                  <Form.Label>Preço (€)</Form.Label>
+                  <Form.Control
+                      type="number"
+                      step="0.01"
+                      value={form.Preco}
+                      onChange={(e) => alterar('Preco', e.target.value)}
+                      required
+                  />
+                </Col>
+                <Col md={3}>
+                  <Form.Label>Stock</Form.Label>
+                  <Form.Control
+                      type="number"
+                      value={form.Stock}
+                      onChange={(e) => alterar('Stock', e.target.value)}
+                  />
+                </Col>
+                <Col md={4}>
+                  <Form.Label>Categoria</Form.Label>
+                  <Form.Select
+                      value={form.Categoria}
+                      onChange={(e) => alterar('Categoria', e.target.value)}
+                  >
+                    {CATEGORIAS.map((c) => (
+                        <option key={c}>{c}</option>
+                    ))}
+                  </Form.Select>
+                </Col>
+                <Col md={12}>
+                  <Form.Label>Foto</Form.Label>
+                  <Form.Control type="file" accept="image/*"
+                                onChange={(e) => setFicheiro(e.target.files?.[0] || null)} />
+                </Col>
+                <Col md={8}>
+                  <Form.Label>Descrição</Form.Label>
+                  <Form.Control
+                      value={form.Descricao}
+                      onChange={(e) => alterar('Descricao', e.target.value)}
+                  />
+                </Col>
+                <Col xs={12}>
+                  <Form.Check
+                      label="Disponível"
+                      checked={form.Disponivel}
+                      onChange={(e) => alterar('Disponivel', e.target.checked)}
+                  />
+                </Col>
+              </Row>
+              <div className="mt-3">
+                <Button type="submit">{editId ? 'Guardar' : 'Criar'}</Button>{' '}
+                {editId && (
+                    <Button
+                        variant="secondary"
+                        onClick={() => {
+                          setForm(VAZIO);
+                          setEditId(null);
+                        }}
+                    >
+                      Cancelar
+                    </Button>
+                )}
+              </div>
+            </Form>
+          </Card.Body>
+        </Card>
 
-      <Table striped hover responsive>
-        <thead>
+        <Table striped hover responsive>
+          <thead>
           <tr>
             <th>Nome</th>
             <th>Categoria</th>
@@ -203,26 +219,26 @@ export default function AdminPage() {
             <th>Stock</th>
             <th></th>
           </tr>
-        </thead>
-        <tbody>
+          </thead>
+          <tbody>
           {produtos.map((p) => (
-            <tr key={p.id}>
-              <td>{p.Nome}</td>
-              <td>{p.Categoria}</td>
-              <td>{Number(p.Preco || 0).toFixed(2)} €</td>
-              <td>{p.Stock ?? 0}</td>
-              <td className="text-end">
-                <Button size="sm" variant="outline-primary" onClick={() => editar(p)}>
-                  Editar
-                </Button>{' '}
-                <Button size="sm" variant="outline-danger" onClick={() => remover(p)}>
-                  Apagar
-                </Button>
-              </td>
-            </tr>
+              <tr key={p.id}>
+                <td>{p.Nome}</td>
+                <td>{p.Categoria}</td>
+                <td>{Number(p.Preco || 0).toFixed(2)} €</td>
+                <td>{p.Stock ?? 0}</td>
+                <td className="text-end">
+                  <Button size="sm" variant="outline-primary" onClick={() => editar(p)}>
+                    Editar
+                  </Button>{' '}
+                  <Button size="sm" variant="outline-danger" onClick={() => remover(p)}>
+                    Apagar
+                  </Button>
+                </td>
+              </tr>
           ))}
-        </tbody>
-      </Table>
-    </>
+          </tbody>
+        </Table>
+      </>
   );
 }
