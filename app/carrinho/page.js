@@ -76,7 +76,7 @@ export default function Carrinho() {
         enderecoEntrega: form.morada,
         produtos: itens.map((i) => i.id), // relação M-N (array de ids)
         itens: itens.map((i) => ({ documentId: i.documentId, quantidade: i.quantidade })), // p/ baixar o stock
-        utilizador: user.id,
+        // o utilizador é definido no servidor (controller), a partir do login
       };
       await criarEncomenda(dados, jwt);
 
