@@ -71,8 +71,11 @@ export default function Carrinho() {
       const dados = {
         estado: 'Pago',
         total: total,
-        enderecoEntrega: `${form.nome} | Tel: ${form.telefone} | ${form.morada}`,
+        nomeCliente: form.nome,
+        telefone: form.telefone,
+        enderecoEntrega: form.morada,
         produtos: itens.map((i) => i.id), // relação M-N (array de ids)
+        itens: itens.map((i) => ({ documentId: i.documentId, quantidade: i.quantidade })), // p/ baixar o stock
         utilizador: user.id,
       };
       await criarEncomenda(dados, jwt);
