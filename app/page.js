@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Row, Col, Card, Badge, Spinner, Alert } from 'react-bootstrap';
+import { Row, Col, Card, Badge, Spinner, Alert, Button } from 'react-bootstrap';
 import { listarProdutos, mediaUrl } from '@/lib/api';
+import { adicionarAoCarrinho } from '@/lib/carrinho';
 
 export default function Catalogo() {
   const [produtos, setProdutos] = useState([]);
@@ -53,6 +54,15 @@ export default function Catalogo() {
                   <span className={p.Disponivel ? 'text-success' : 'text-danger'}>
                     {p.Disponivel ? `Stock: ${p.Stock ?? 0}` : 'Indisponível'}
                   </span>
+                    <Button
+                        style={{ backgroundColor: "green"}}
+                        variant="primary"
+                        size="sm"
+                        disabled={!p.Disponivel}
+                        onClick={() => adicionarAoCarrinho(p)}
+                    >
+                        Adicionar
+                    </Button>
                 </Card.Footer>
               </Card>
             </Col>
